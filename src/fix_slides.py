@@ -41,9 +41,11 @@ min_slide = 0
 slide_width = 10
 frame = 1
 
-while frame is not None:
+while True:
     i += 1
     ret,frame = cap.read()
+    if frame is None:
+        break
     cropped = frame[video_slide_lower:video_slide_upper+1, video_slide_left:video_slide_right+1, :]
     cropped_gray = np.reshape(cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY), video_slide_length)
     if last_cropped_gray is not None:
