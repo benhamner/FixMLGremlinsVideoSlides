@@ -5,7 +5,8 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 # I/O paths
-video_path  =  "../data/MachineLearningGremlins.mp4"
+video_path  = "../data/MachineLearningGremlins.mp4"
+bci_path    = "../data/bci.mp4"
 output_path = "../data/out.avi"
 slide_paths = ["../data/Slides/Slide%d.PNG" % i for i in range(1,148)]
 log_file    = open("../data/log.txt", "w")
@@ -13,16 +14,19 @@ log_writer  = csv.writer(log_file, lineterminator="\n")
 log_writer.writerow(["Frame", "Slide", "SlideCorrelation"])
 
 # Parameters
-video_width        = 1280
-video_height       = 720
-video_slide_left   = 244
-video_slide_lower  = 66
-video_slide_upper  = 654
-video_slide_right  = 1279
-video_slide_width  = video_slide_right - video_slide_left  + 1
-video_slide_height = video_slide_upper - video_slide_lower + 1
-video_slide_size   = (video_slide_width, video_slide_height)
-video_slide_length = video_slide_height * video_slide_width
+video_width           = 1280
+video_height          = 720
+video_slide_left      = 244
+video_slide_lower     = 66
+video_slide_upper     = 654
+video_slide_right     = 1279
+video_slide_width     = video_slide_right - video_slide_left  + 1
+video_slide_height    = video_slide_upper - video_slide_lower + 1
+video_slide_size      = (video_slide_width, video_slide_height)
+video_slide_length    = video_slide_height * video_slide_width
+bci_start_frame       = 5090
+video_start_bci_frame = 2949
+video_stop_bci_frame  = 4509
 
 # Read in slides
 slides_original = [cv2.imread(path) for path in slide_paths]
@@ -36,6 +40,14 @@ print("Frame Rate: \t%f" % cap.get(cv.CV_CAP_PROP_FPS))
 print("Frame Count:\t%d" % cap.get(cv.CV_CAP_PROP_FRAME_COUNT))
 xvid = cv.CV_FOURCC('X','V','I','D')
 video_writer = cv2.VideoWriter(output_path, xvid, frame_rate, (video_width, video_height), True)
+
+bci_cap = cv2.VideoCapture(bci_path)
+frame_rate = bci_cap.get(cv.CV_CAP_PROP_FPS)
+print("BCI Frame Rate: \t%f" % frame_rate)
+# get BCI to right frame
+for i in range(bci_start_frame):
+    ret,frame = bci_cap.read()
+cv2.imwrite("../data/bci_frame.png", frame)
 
 # Initialization Parameters
 last_cropped_gray = None
@@ -56,6 +68,17 @@ while True:
         break
     cropped = frame[video_slide_lower:video_slide_upper+1, video_slide_left:video_slide_right+1, :]
     cropped_gray = np.reshape(cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY), video_slide_length)
+    if video_start_bci_frame <= i <= video_stop_bci_frame:
+        ret,bci_frame = bci_cap.read()
+        if bci_frame is None:
+            bci_frame = last_bci_frame
+        else:
+            last_bci_frame = bci_frame
+        bci_frame_resized = cv2.resize(bci_frame[2:-1,3:,:], video_slide_size)
+        frame[video_slide_lower:video_slide_upper+1, video_slide_left:video_slide_right+1, :] = bci_frame_resized
+        video_writer.write(frame)
+        continue
+        last_transition_corr = 1.0
     if last_cropped_gray is not None:
         transition_corr = np.corrcoef(last_cropped_gray, cropped_gray)[0,1]
     last_cropped_gray = cropped_gray
